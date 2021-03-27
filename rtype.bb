@@ -29,6 +29,7 @@ DEFTYPE .w
 
 #BACKGROUND_WIDTH = 704
 
+
 ;******************************************************************************
 ; VARIABILI
 ;******************************************************************************
@@ -36,7 +37,7 @@ Dim map(#MAP_WIDTH,#MAP_HEIGHT)
 scrollX.q = 16.0
 fineScroll.q = 0
 newBlockRow = 0
-mapPointer = 22
+mapPointer = 0
 newBlockRightX = 352
 newBlockLeftX = 0
 
@@ -101,42 +102,41 @@ End Statement
 
 ; inizializza la mappa
 Statement InitMap{}
-    Shared map()
+    Shared map(),mapPointer
     
     For y=0 To 11
-        For x=0 To 21
+        For x=0 To 20
             tileIndex = map(x,y)
-            Block (#SHAPE_TILE+tileIndex),x*16,y*16
-            Block (#SHAPE_TILE+tileIndex),352+x*16,y*16
+            Block (#SHAPE_TILE+tileIndex),16+x*16,y*16
         Next
     Next
+    
+    mapPointer = 21
 End Statement
 
 ; fa scorrere la mappa orizzontalmente a sx
 Statement ScrollMap{}
     Shared map(),scrollX,fineScroll,mapPointer,newBlockRow,newBlockRightX,newBlockLeftX
 
-    scrollX = scrollX + 0.5
     fineScroll = fineScroll + 0.5
 
-    If scrollX >= (320+32)
-        scrollX = 0
-        newBlockRightX = 352
-        newBlockLeftX = 0
-    EndIf
-
+    If scrollX >= (320+32+16) Then scrollX = 16
+    
     If newBlockRow<12
         tileIndex = map(mapPointer,newBlockRow)
-        Block (#SHAPE_TILE+tileIndex),newBlockRightX,newBlockRow*16
+        newBlockLeftX = scrollX-16
+        newBlockRightX = scrollX + 320+16
+        
         Block (#SHAPE_TILE+tileIndex),newBlockLeftX,newBlockRow*16
+        Block (#SHAPE_TILE+tileIndex),newBlockRightX,newBlockRow*16
+
         newBlockRow = newBlockRow+1
     EndIf
     
     If fineScroll = 16
+        scrollX = scrollX + 16
         fineScroll = 0
         newBlockRow = 0
-        newBlockRightX = newBlockRightX + 16
-        newBlockLeftX = newBlockLeftX + 16
         mapPointer = mapPointer + 1
     EndIf
 
@@ -150,7 +150,7 @@ InitTiles{}
 InitializePalette{}
 InitCopper{}
 InitMap{}
-;scrollX = 320+32
+
 
 ;******************************************************************************
 ; MAIN LOOP
@@ -158,7 +158,7 @@ InitMap{}
 ; ripete main loop finchè non viene premuto il tasto del mouse
 While Joyb(0)=0
     
-    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX,0
+    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0
 
     ScrollMap{}
     
