@@ -24,11 +24,21 @@ DEFTYPE .w
 
 #COPPERLIST_MAIN = 0
 #BITMAP_BACKGROUND = 0
-#BITMAP_TILES = 1
+#BITMAP_FOREGROUND = 1
+#BITMAP_TILES = 2
+#BITMAP_SHIP = 3
 #PALETTE_MAIN = 0
 #SHAPE_TILE = 0
+#SHAPE_SHIP = 500
+
+#QUEUE_ID = 0
 
 #BACKGROUND_WIDTH = 704
+#BACKGROUND_HEIGHT = 256
+#FOREGROUND_WIDTH = 384
+#FOREGROUND_HEIGHT = 256
+#BPP = 4
+
 
 
 ;******************************************************************************
@@ -62,27 +72,57 @@ Statement InitTiles{}
         Next x
     Next y
     
+    Free BitMap #BITMAP_TILES
+End Statement
+
+; inizializza lo ship
+Statement InitShip{}
+    
+    ; bitmap contenente i tiles
+    BitMap #BITMAP_SHIP,96,16,4
+    LoadBitMap #BITMAP_SHIP,"ship.iff"
+
+    Use BitMap #BITMAP_SHIP
+    ; crea una shape per ogni tile
+    i=#SHAPE_SHIP
+    For x=0 To 95 Step 32
+        GetaShape i,x,0,32,16
+        i = i+1
+    Next
+    
+    Free BitMap #BITMAP_SHIP
 End Statement
 
 ; inizializza e carica la palette
 Statement InitializePalette{}
-    InitPalette #PALETTE_MAIN,16
+    InitPalette #PALETTE_MAIN,32
     LoadPalette #PALETTE_MAIN,"level1_tiles.iff",0
+    LoadPalette #PALETTE_MAIN,"level1_tiles.iff",16
+    ;AGAPalRGB #PALETTE_MAIN,16,0,0,0
 End Statement
 
 ; inizializza la copperlist ed il display dello schermo
 Statement InitCopper{}
     ; impostazioni della copperlist
-    copperListType.l = $4                       ; 4 bitplanes
+    copperListType.l = $8                       ; 8 bitplanes
     copperListType = copperListType + $10       ; smooth scrolling
+    copperListType = copperListType + $20       ; dual playfield
     copperListType = copperListType + $10000    ; AGA colors
 
     ; sfondo dello schermo
-    BitMap #BITMAP_BACKGROUND,#BACKGROUND_WIDTH,256,4
+    BitMap #BITMAP_BACKGROUND,#BACKGROUND_WIDTH,#BACKGROUND_HEIGHT,#BPP
 
-    InitCopList #COPPERLIST_MAIN,44,256,copperListType,8,16,0
+    ; foreground in cui vengono disegnati i bob dello ship, degli alieni e dei bullets
+    BitMap #BITMAP_FOREGROUND,#FOREGROUND_WIDTH,#FOREGROUND_HEIGHT,#BPP   
 
+    InitCopList #COPPERLIST_MAIN,44,256,copperListType,8,32,0
+    
     DisplayPalette #COPPERLIST_MAIN,#PALETTE_MAIN
+
+    ; Workaround per fixare gli indici della palette per il playfield 2 nella posizione corretta
+    DisplayControls #COPPERLIST_MAIN,0,$1C00,0
+
+    Queue #QUEUE_ID,32
 
     BLITZ
 
@@ -112,6 +152,8 @@ End Statement
 Statement InitMap{}
     Shared map(),mapPointer
     
+    Use BitMap #BITMAP_BACKGROUND
+
     For y=0 To 11
         For x=0 To 20
             tileIndex = map(#MAP_START+x,y)
@@ -125,6 +167,8 @@ End Statement
 ; fa scorrere la mappa orizzontalmente a sx
 Statement ScrollMap{}
     Shared map(),scrollX,fineScroll,mapPointer,newBlockRow,newBlockRightX,newBlockLeftX
+
+    Use BitMap #BITMAP_BACKGROUND
 
     If mapPointer < #MAP_WIDTH
         
@@ -153,11 +197,18 @@ Statement ScrollMap{}
     EndIf
 End Statement
 
+Statement DrawShip{}
+    Use BitMap #BITMAP_FOREGROUND
+    UnQueue #QUEUE_ID
+    QBlit #QUEUE_ID,#SHAPE_SHIP+1,32,100
+End Statement
+
 ;******************************************************************************
 ; MAIN
 ;******************************************************************************
 LoadMapData{}
 InitTiles{}
+InitShip{}
 InitializePalette{}
 InitCopper{}
 InitMap{}
@@ -169,10 +220,12 @@ InitMap{}
 ; ripete main loop finchè non viene premuto il tasto del mouse
 While Joyb(0)=0
     
-    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0
+    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0,#BITMAP_FOREGROUND,32,0
 
     ScrollMap{}
     
+    DrawShip{}
+
     ; attende il vertical blank
     VWait
 Wend
