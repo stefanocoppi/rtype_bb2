@@ -27,9 +27,13 @@ DEFTYPE .w
 #BITMAP_FOREGROUND = 1
 #BITMAP_TILES = 2
 #BITMAP_SHIP = 3
+#BITMAP_ENEMY01 = 4
+
 #PALETTE_MAIN = 0
+
 #SHAPE_TILE = 0
 #SHAPE_SHIP = 500
+#SHAPE_ENEMY01 = 510
 
 #QUEUE_ID = 0
 
@@ -46,6 +50,11 @@ DEFTYPE .w
 #SHIP_ANIM_DOWN = 2
 #SHIP_SPEED = 2
 
+#WAVES_NUM = 1
+#WAVE_PATH_LINEAR = 0
+
+#MAX_ENEMIES = 8
+
 ;******************************************************************************
 ; TIPI DI DATO
 ;******************************************************************************
@@ -55,6 +64,29 @@ NEWTYPE .Ship
     animState.b
 End NEWTYPE
 
+NEWTYPE .Alien
+    x.w
+    y.w
+    numFrames.b
+    currFrame.b
+    animDelay.w
+    currDelay.w
+    speed.w
+    width.w
+    height.w
+    state.b
+    pause.w
+End NEWTYPE
+
+; formazione o wave di alieni
+NEWTYPE .AlienWave
+    numEnemies.b        
+    alien.Alien         ; alieno usato nella wave
+    mapOffset.w         ; offset nella mappa a cui deve comparire la wave
+    pause.w             ; pausa tra la creazione di un alieno ed il successivo
+    yoffset.w           ; distanza verticale tra gli alieni in caso di path lineare
+    pathType.b          ; tipologia di path seguito dagli alieni
+End NEWTYPE
 
 ;******************************************************************************
 ; VARIABILI
@@ -67,6 +99,12 @@ mapPointer = 0
 newBlockRightX = 352
 newBlockLeftX = 0
 DEFTYPE .Ship myShip
+
+Dim waves.AlienWave(#WAVES_NUM)
+Dim aliens.Alien(#MAX_ENEMIES)
+currentWaveNumEnemies.b = 0
+currentWavePathType.b = 0
+waveStarted.b = False
 
 ;******************************************************************************
 ; Procedure
@@ -112,6 +150,23 @@ Statement InitShip{}
     myShip\x = #SHIP_X0
     myShip\y = #SHIP_Y0
     myShip\animState = #SHIP_ANIM_IDLE
+End Statement
+
+Statement InitEnemy01{}
+
+    ; bitmap contenente i tiles
+    BitMap #BITMAP_ENEMY01,256,19,4
+    LoadBitMap #BITMAP_ENEMY01,"enemy01.iff"
+
+    Use BitMap #BITMAP_ENEMY01
+    ; crea una shape per ogni tile
+    i=#SHAPE_ENEMY01
+    For x=0 To 255 Step 32
+        GetaShape i,x,0,32,19
+        i = i+1
+    Next
+    
+    Free BitMap #BITMAP_ENEMY01
 End Statement
 
 ; inizializza e carica la palette
@@ -222,7 +277,7 @@ Statement DrawShip{}
     Shared myShip
 
     Use BitMap #BITMAP_FOREGROUND
-    UnQueue #QUEUE_ID
+    ;UnQueue #QUEUE_ID
     QBlit #QUEUE_ID,#SHAPE_SHIP+myShip\animState,myShip\x,myShip\y
 End Statement
 
@@ -238,12 +293,118 @@ Statement MoveShip{}
     myShip\animState = Joyy(1) + 1
 End Statement
 
+Statement DrawEnemy01{}
+
+    Use BitMap #BITMAP_FOREGROUND
+    ;UnQueue #QUEUE_ID
+    QBlit #QUEUE_ID,#SHAPE_ENEMY01,300,100
+End Statement
+
+; inizializza l'array delle waves
+Statement InitWaves{}
+    Shared waves()
+    
+    Read numEnemies
+    waves(0)\numEnemies = numEnemies
+    Read x,y
+    waves(0)\alien\x = x
+    waves(0)\alien\y = y
+    Read numFrames
+    waves(0)\alien\numFrames = numFrames
+    waves(0)\alien\currFrame = 0
+    Read animDelay
+    waves(0)\alien\animDelay = animDelay
+    waves(0)\alien\currDelay = 0
+    Read speed 
+    waves(0)\alien\speed = speed
+    Read width,height
+    waves(0)\alien\width = width
+    waves(0)\alien\height = height
+    waves(0)\alien\state = 0
+    Read mapOffset
+    waves(0)\mapOffset = mapOffset
+    Read pause
+    waves(0)\pause = pause
+    Read yoffset
+    waves(0)\yoffset = yoffset
+    Read pathType
+    waves(0)\pathType = pathType
+End Statement
+
+; avvia una nuova wave di alieni
+Statement StartWave{}
+    Shared waves(),aliens(),mapPointer,currentWaveNumEnemies,currentWavePathType,waveStarted
+
+    ; cerca una wave con mapOffset = mapPointer
+    For i=0 To #WAVES_NUM-1
+        If (waves(i)\mapOffset = mapPointer) And (waveStarted=False)
+            waveStarted = True
+            currentWaveNumEnemies = waves(i)\numEnemies
+            currentWavePathType = waves(i)\pathType
+
+            ; inizializza l'array dei nemici
+            For j=0 To waves(i)\numEnemies-1
+                aliens(j)\x         = waves(i)\alien\x
+                If waves(i)\pathType = #WAVE_PATH_LINEAR
+                    aliens(j)\y         = waves(i)\alien\y+j*waves(i)\yoffset
+                Else
+                    aliens(j)\y         = waves(i)\alien\y
+                EndIf
+                aliens(j)\numFrames = waves(i)\alien\numFrames
+                aliens(j)\currFrame = waves(i)\alien\currFrame
+                aliens(j)\animDelay = waves(i)\alien\animDelay
+                aliens(j)\currDelay = waves(i)\alien\currDelay
+                aliens(j)\speed     = waves(i)\alien\speed
+                aliens(j)\width     = waves(i)\alien\width
+                aliens(j)\height    = waves(i)\alien\height
+                aliens(j)\state     = waves(i)\alien\state
+                aliens(j)\pause     = waves(i)\pause*(j+1)
+            Next
+        EndIf
+    Next
+End Statement
+
+; processa il movimento degli alieni della wave corrente
+Statement ProcessAliens{}
+    Shared aliens(),currentWaveNumEnemies,currentWavePathType
+
+    For i=0 To currentWaveNumEnemies -1
+        ; attende in caso di pausa >0
+        If aliens(i)\pause > 0
+            aliens(i)\pause = aliens(i)\pause - 1
+        Else
+            Select currentWavePathType
+                Case #WAVE_PATH_LINEAR
+                    aliens(i)\x = aliens(i)\x - aliens(i)\speed
+                    aliens(i)\x = QLimit(aliens(i)\x,0,352)
+            End Select
+        EndIf
+        
+    Next
+End Statement
+
+; disegna i nemici
+Statement DrawEnemies{}
+    Shared aliens(),currentWaveNumEnemies
+
+    Use BitMap #BITMAP_FOREGROUND
+
+    For i=0 To currentWaveNumEnemies-1
+        QBlit #QUEUE_ID,#SHAPE_ENEMY01,aliens(i)\x,aliens(i)\y
+    Next
+
+End Statement
+
 ;******************************************************************************
 ; MAIN
 ;******************************************************************************
+Restore mapData
 LoadMapData{}
+Restore wavesData
+InitWaves{}
 InitTiles{}
 InitShip{}
+InitEnemy01{}
 InitializePalette{}
 InitCopper{}
 InitMap{}
@@ -259,13 +420,20 @@ While Joyb(0)=0
 
     ScrollMap{}
     
+    UnQueue #QUEUE_ID
+
     MoveShip{}
     DrawShip{}
+
+    StartWave{}
+    ProcessAliens{}
+    DrawEnemies{}
 
     ; attende il vertical blank
     VWait
 Wend
 
+mapData:
 ; line 0
 Data.w  $0000, $0000, $0000, $0000, $0000, $8000, $8000, $8000, $8000, $E000, $E000, $E000, $E000, $0000, $0000, $0000
 Data.w  $0000, $0000, $0000, $0000, $0000, $0000, $0104, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000
@@ -494,6 +662,17 @@ Data  32771,32772,32773,32774,32775,32776,32769,32770,32771,32772,32808,32809,32
 Data  32834,32835,32769,32770,32771,32772,32777,32778,32779,32780,32769,32770,32771,32772,32773,32774
 Data  32775,32776,32777,32778,32779,32780,32769,32770,32771,32772,32932,32933
 
-
+wavesData:
+; wave 0 - enemy01
+Data  4                     ; numEnemies
+Data  352,40                ; x,y
+Data  8                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,19                 ; width,height
+Data  22                    ; mapOffset
+Data  40                    ; pause
+Data  30                    ; yoffset
+Data  0                     ; pathType WAVE_PATH_LINEAR
 End
 
