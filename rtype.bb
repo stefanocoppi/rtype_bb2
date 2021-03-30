@@ -39,6 +39,21 @@ DEFTYPE .w
 #FOREGROUND_HEIGHT = 256
 #BPP = 4
 
+#SHIP_X0 = 64
+#SHIP_Y0 = 88
+#SHIP_ANIM_IDLE = 1
+#SHIP_ANIM_UP   = 0
+#SHIP_ANIM_DOWN = 2
+#SHIP_SPEED = 2
+
+;******************************************************************************
+; TIPI DI DATO
+;******************************************************************************
+NEWTYPE .Ship
+    x.w
+    y.w
+    animState.b
+End NEWTYPE
 
 
 ;******************************************************************************
@@ -51,6 +66,7 @@ newBlockRow = 0
 mapPointer = 0
 newBlockRightX = 352
 newBlockLeftX = 0
+DEFTYPE .Ship myShip
 
 ;******************************************************************************
 ; Procedure
@@ -77,7 +93,8 @@ End Statement
 
 ; inizializza lo ship
 Statement InitShip{}
-    
+    Shared myShip
+
     ; bitmap contenente i tiles
     BitMap #BITMAP_SHIP,96,16,4
     LoadBitMap #BITMAP_SHIP,"ship.iff"
@@ -91,6 +108,10 @@ Statement InitShip{}
     Next
     
     Free BitMap #BITMAP_SHIP
+
+    myShip\x = #SHIP_X0
+    myShip\y = #SHIP_Y0
+    myShip\animState = #SHIP_ANIM_IDLE
 End Statement
 
 ; inizializza e carica la palette
@@ -198,9 +219,23 @@ Statement ScrollMap{}
 End Statement
 
 Statement DrawShip{}
+    Shared myShip
+
     Use BitMap #BITMAP_FOREGROUND
     UnQueue #QUEUE_ID
-    QBlit #QUEUE_ID,#SHAPE_SHIP+1,32,100
+    QBlit #QUEUE_ID,#SHAPE_SHIP+myShip\animState,myShip\x,myShip\y
+End Statement
+
+Statement MoveShip{}
+    Shared myShip
+
+    myShip\x = myShip\x + Joyx(1)*#SHIP_SPEED
+    myShip\y = myShip\y + Joyy(1)*#SHIP_SPEED
+
+    myShip\x = QLimit( myShip\x,32,320)
+    myShip\y = QLimit( myShip\y,0,176)
+
+    myShip\animState = Joyy(1) + 1
 End Statement
 
 ;******************************************************************************
@@ -224,6 +259,7 @@ While Joyb(0)=0
 
     ScrollMap{}
     
+    MoveShip{}
     DrawShip{}
 
     ; attende il vertical blank
