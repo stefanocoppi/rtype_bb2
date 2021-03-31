@@ -18,6 +18,8 @@ DEFTYPE .w
 ;******************************************************************************
 ; COSTANTI
 ;******************************************************************************
+#KEY_ESC = $45
+
 #MAP_WIDTH  = 268
 #MAP_HEIGHT = 12
 #MAP_START  = 0
@@ -25,9 +27,9 @@ DEFTYPE .w
 #COPPERLIST_MAIN = 0
 #BITMAP_BACKGROUND = 0
 #BITMAP_FOREGROUND = 1
-#BITMAP_TILES = 2
-#BITMAP_SHIP = 3
-#BITMAP_ENEMY01 = 4
+#BITMAP_TILES = 3
+#BITMAP_SHIP = 4
+#BITMAP_ENEMY01 = 5
 
 #PALETTE_MAIN = 0
 
@@ -51,13 +53,25 @@ DEFTYPE .w
 #SHIP_SPEED = 2
 
 #WAVES_NUM = 1
-#WAVE_PATH_LINEAR = 0
+#WAVE_PATH_LINEAR   = 0
+#WAVE_PATH_SIN      = 1
+#WAVE_PATH_CIRCLE   = 2
 
 #MAX_ENEMIES = 8
+
+#ALIENS_STATE_ACTIVE = 0
+#ALIENS_STATE_INACTIVE = 1
+
 
 ;******************************************************************************
 ; TIPI DI DATO
 ;******************************************************************************
+
+NEWTYPE .Vector2
+    x.w
+    y.w
+End NEWTYPE
+
 NEWTYPE .Ship
     x.w
     y.w
@@ -76,6 +90,8 @@ NEWTYPE .Alien
     height.w
     state.b
     pause.w
+    shapeID.w
+    pathOffset.w
 End NEWTYPE
 
 ; formazione o wave di alieni
@@ -105,6 +121,12 @@ Dim aliens.Alien(#MAX_ENEMIES)
 currentWaveNumEnemies.b = 0
 currentWavePathType.b = 0
 waveStarted.b = False
+currentWaveY.w = 0
+Dim sinLUT.f(353)
+
+Dim circularPath.Vector2(715)
+aliensInactiveCount = 0
+db=0
 
 ;******************************************************************************
 ; Procedure
@@ -129,6 +151,7 @@ Statement InitTiles{}
     Free BitMap #BITMAP_TILES
 End Statement
 
+
 ; inizializza lo ship
 Statement InitShip{}
     Shared myShip
@@ -152,7 +175,48 @@ Statement InitShip{}
     myShip\animState = #SHIP_ANIM_IDLE
 End Statement
 
-Statement InitEnemy01{}
+
+; inizializza la look up table del sin, usata per il path degli alieni
+Statement InitSinLUT{}
+    Shared sinLUT()
+
+    For x=0 To 352
+        s.f = Sin(x*Pi/180)
+        sinLUT(x) = s
+    Next
+End Statement
+
+
+; inizializza la look up table con le coordinate del path circolare degli alieni
+Statement InitCircularPath{}
+    Shared circularPath()
+
+    ; ingresso nello schermo
+    For i=0 To 80
+        circularPath(i)\x = 352-i
+        circularPath(i)\y = 84
+    Next
+
+    ; movimento circolare
+    For x=0 To 360
+        s.f = Sin(x*Pi/180)
+        c.f = Cos(x*Pi/180)
+        circularPath(i)\x = 32 + 160 + 80*c
+        circularPath(i)\y = 84 - 80*s
+        i = i+1
+    Next
+
+    ; uscita dallo schermo
+    For x=272 To 0 Step -1
+        circularPath(i)\x = x
+        circularPath(i)\y = 84
+        i = i+1
+    Next
+End Statement
+
+
+; carica la grafica di Enemy01
+Statement LoadEnemy01Gfx{}
 
     ; bitmap contenente i tiles
     BitMap #BITMAP_ENEMY01,256,19,4
@@ -169,6 +233,13 @@ Statement InitEnemy01{}
     Free BitMap #BITMAP_ENEMY01
 End Statement
 
+
+; carica la grafica degli alieni
+Statement LoadAliensGfx{}
+    LoadEnemy01Gfx{}
+End Statement
+
+
 ; inizializza e carica la palette
 Statement InitializePalette{}
     InitPalette #PALETTE_MAIN,32
@@ -176,6 +247,7 @@ Statement InitializePalette{}
     LoadPalette #PALETTE_MAIN,"level1_tiles.iff",16
     ;AGAPalRGB #PALETTE_MAIN,16,0,0,0
 End Statement
+
 
 ; inizializza la copperlist ed il display dello schermo
 Statement InitCopper{}
@@ -188,8 +260,9 @@ Statement InitCopper{}
     ; sfondo dello schermo
     BitMap #BITMAP_BACKGROUND,#BACKGROUND_WIDTH,#BACKGROUND_HEIGHT,#BPP
 
-    ; foreground in cui vengono disegnati i bob dello ship, degli alieni e dei bullets
+    ; foreground in cui vengono disegnati i bob dello ship, degli alieni e dei bullets (double buffered)
     BitMap #BITMAP_FOREGROUND,#FOREGROUND_WIDTH,#FOREGROUND_HEIGHT,#BPP   
+    BitMap #BITMAP_FOREGROUND+1,#FOREGROUND_WIDTH,#FOREGROUND_HEIGHT,#BPP
 
     InitCopList #COPPERLIST_MAIN,44,256,copperListType,8,32,0
     
@@ -198,12 +271,18 @@ Statement InitCopper{}
     ; Workaround per fixare gli indici della palette per il playfield 2 nella posizione corretta
     DisplayControls #COPPERLIST_MAIN,0,$1C00,0
 
+    ; creiamo due code, a causa del double buffering
     Queue #QUEUE_ID,32
+    Queue #QUEUE_ID+1,32
 
     BLITZ
 
     CreateDisplay #COPPERLIST_MAIN
+
+    ; abilita lettura raw della tastiera
+    BlitzKeys On
 End Statement
+
 
 ; carica i dati della mappa in memoria
 Statement LoadMapData{}
@@ -274,11 +353,11 @@ Statement ScrollMap{}
 End Statement
 
 Statement DrawShip{}
-    Shared myShip
+    Shared myShip,db
 
-    Use BitMap #BITMAP_FOREGROUND
+    Use BitMap #BITMAP_FOREGROUND+db
     ;UnQueue #QUEUE_ID
-    QBlit #QUEUE_ID,#SHAPE_SHIP+myShip\animState,myShip\x,myShip\y
+    QBlit #QUEUE_ID+db,#SHAPE_SHIP+myShip\animState,myShip\x,myShip\y
 End Statement
 
 Statement MoveShip{}
@@ -293,118 +372,166 @@ Statement MoveShip{}
     myShip\animState = Joyy(1) + 1
 End Statement
 
-Statement DrawEnemy01{}
 
-    Use BitMap #BITMAP_FOREGROUND
-    ;UnQueue #QUEUE_ID
-    QBlit #QUEUE_ID,#SHAPE_ENEMY01,300,100
-End Statement
-
-; inizializza l'array delle waves
+; inizializza l'array delle waves, leggendo i dati
+; NB: prima di chiamare questa procedura, usare Restore wavesData
+; per posizionare correttamente il puntatore ai dati
 Statement InitWaves{}
     Shared waves()
     
-    Read numEnemies
-    waves(0)\numEnemies = numEnemies
-    Read x,y
-    waves(0)\alien\x = x
-    waves(0)\alien\y = y
-    Read numFrames
-    waves(0)\alien\numFrames = numFrames
-    waves(0)\alien\currFrame = 0
-    Read animDelay
-    waves(0)\alien\animDelay = animDelay
-    waves(0)\alien\currDelay = 0
-    Read speed 
-    waves(0)\alien\speed = speed
-    Read width,height
-    waves(0)\alien\width = width
-    waves(0)\alien\height = height
-    waves(0)\alien\state = 0
-    Read mapOffset
-    waves(0)\mapOffset = mapOffset
-    Read pause
-    waves(0)\pause = pause
-    Read yoffset
-    waves(0)\yoffset = yoffset
-    Read pathType
-    waves(0)\pathType = pathType
+    For i=0 To #WAVES_NUM-1
+        Read numEnemies
+        waves(i)\numEnemies = numEnemies
+        Read x,y
+        waves(i)\alien\x = x
+        waves(i)\alien\y = y
+        Read numFrames
+        waves(i)\alien\numFrames = numFrames
+        waves(i)\alien\currFrame = 0
+        Read animDelay
+        waves(i)\alien\animDelay = animDelay
+        waves(i)\alien\currDelay = 0
+        Read speed 
+        waves(i)\alien\speed = speed
+        Read width,height
+        waves(i)\alien\width = width
+        waves(i)\alien\height = height
+        waves(i)\alien\state = #ALIENS_STATE_ACTIVE
+        Read shapeID
+        waves(i)\alien\shapeID = shapeID
+        Read mapOffset
+        waves(i)\mapOffset = mapOffset
+        Read pause
+        waves(i)\pause = pause
+        Read yoffset
+        waves(i)\yoffset = yoffset
+        Read pathType
+        waves(i)\pathType = pathType
+    Next
+    
 End Statement
 
-; avvia una nuova wave di alieni
-Statement StartWave{}
-    Shared waves(),aliens(),mapPointer,currentWaveNumEnemies,currentWavePathType,waveStarted
 
-    ; cerca una wave con mapOffset = mapPointer
+; avvia una nuova wave di alieni
+Statement StartNewWave{}
+    Shared waves(),aliens(),mapPointer,currentWaveNumEnemies,currentWavePathType,waveStarted,currentWaveY
+
+    ; se non è stata ancora avviata una wave, cerca una wave con mapOffset = mapPointer
     For i=0 To #WAVES_NUM-1
         If (waves(i)\mapOffset = mapPointer) And (waveStarted=False)
             waveStarted = True
             currentWaveNumEnemies = waves(i)\numEnemies
             currentWavePathType = waves(i)\pathType
+            currentWaveY = waves(i)\alien\y
 
             ; inizializza l'array dei nemici
             For j=0 To waves(i)\numEnemies-1
                 aliens(j)\x         = waves(i)\alien\x
                 If waves(i)\pathType = #WAVE_PATH_LINEAR
-                    aliens(j)\y         = waves(i)\alien\y+j*waves(i)\yoffset
+                    aliens(j)\y     = waves(i)\alien\y+j*waves(i)\yoffset
                 Else
-                    aliens(j)\y         = waves(i)\alien\y
+                    aliens(j)\y     = waves(i)\alien\y
                 EndIf
                 aliens(j)\numFrames = waves(i)\alien\numFrames
-                aliens(j)\currFrame = waves(i)\alien\currFrame
+                ;aliens(j)\currFrame = waves(i)\alien\currFrame
+                aliens(j)\currFrame = Rnd(waves(i)\alien\numFrames-1)
                 aliens(j)\animDelay = waves(i)\alien\animDelay
                 aliens(j)\currDelay = waves(i)\alien\currDelay
                 aliens(j)\speed     = waves(i)\alien\speed
                 aliens(j)\width     = waves(i)\alien\width
                 aliens(j)\height    = waves(i)\alien\height
                 aliens(j)\state     = waves(i)\alien\state
+                aliens(j)\shapeID   = waves(i)\alien\shapeID
                 aliens(j)\pause     = waves(i)\pause*(j+1)
+                aliens(j)\pathOffset = 0
             Next
         EndIf
     Next
 End Statement
 
+
 ; processa il movimento degli alieni della wave corrente
 Statement ProcessAliens{}
-    Shared aliens(),currentWaveNumEnemies,currentWavePathType
+    Shared aliens(),currentWaveNumEnemies,currentWavePathType,waveStarted,sinLUT(),currentWaveY
+    Shared cosLUT(),sinLUT2(),circularPath(),aliensInactiveCount
 
-    For i=0 To currentWaveNumEnemies -1
-        ; attende in caso di pausa >0
-        If aliens(i)\pause > 0
-            aliens(i)\pause = aliens(i)\pause - 1
-        Else
-            Select currentWavePathType
-                Case #WAVE_PATH_LINEAR
-                    aliens(i)\x = aliens(i)\x - aliens(i)\speed
+    If waveStarted = True
+        For i=0 To currentWaveNumEnemies -1
+            If aliens(i)\state = #ALIENS_STATE_ACTIVE
+                ; attende in caso di pausa >0
+                If aliens(i)\pause > 0
+                    aliens(i)\pause = aliens(i)\pause - 1
+                Else
+                    ; animazione
+                    aliens(i)\currDelay = aliens(i)\currDelay + 1
+                    If aliens(i)\currDelay = aliens(i)\animDelay
+                        aliens(i)\currDelay = 0
+                        aliens(i)\currFrame = aliens(i)\currFrame + 1
+                        If aliens(i)\currFrame = aliens(i)\numFrames Then aliens(i)\currFrame = 0
+                    EndIf
+
+                    ; movimento
+                    Select currentWavePathType
+                        Case #WAVE_PATH_LINEAR
+                            aliens(i)\x = aliens(i)\x - aliens(i)\speed
+                        Case #WAVE_PATH_SIN
+                            aliens(i)\x = aliens(i)\x - aliens(i)\speed
+                            y.f = 30*sinLUT(aliens(i)\x)
+                            aliens(i)\y = currentWaveY+y
+                        Case #WAVE_PATH_CIRCLE
+                            If aliens(i)\pathOffset <= 715
+                                aliens(i)\x = circularPath(aliens(i)\pathOffset)\x
+                                aliens(i)\y = circularPath(aliens(i)\pathOffset)\y
+                                aliens(i)\pathOffset = aliens(i)\pathOffset+1
+                            EndIf
+                    End Select
+
                     aliens(i)\x = QLimit(aliens(i)\x,0,352)
-            End Select
+                    aliens(i)\y = QLimit(aliens(i)\y,0,160)
+                EndIf
+                
+                ; se x=0 allora cambia lo stato dell'alieno in inattivo
+                If aliens(i)\x = 0
+                    aliens(i)\state = #ALIENS_STATE_INACTIVE
+                    aliensInactiveCount = aliensInactiveCount + 1
+                EndIf
+            EndIf
+        Next
+
+        ; condizione di fine wave, che consente di avviare una nuova wave
+        If (aliensInactiveCount = currentWaveNumEnemies) And (currentWaveNumEnemies > 0)
+            waveStarted = False    
         EndIf
-        
-    Next
+    EndIf
 End Statement
+
 
 ; disegna i nemici
-Statement DrawEnemies{}
-    Shared aliens(),currentWaveNumEnemies
+Statement DrawAliens{}
+    Shared aliens(),currentWaveNumEnemies,db
 
-    Use BitMap #BITMAP_FOREGROUND
+    Use BitMap #BITMAP_FOREGROUND+db
 
     For i=0 To currentWaveNumEnemies-1
-        QBlit #QUEUE_ID,#SHAPE_ENEMY01,aliens(i)\x,aliens(i)\y
+        QBlit #QUEUE_ID+db,aliens(i)\shapeID+aliens(i)\currFrame,aliens(i)\x,aliens(i)\y
     Next
 
 End Statement
+
 
 ;******************************************************************************
 ; MAIN
 ;******************************************************************************
+main:
 Restore mapData
 LoadMapData{}
 Restore wavesData
 InitWaves{}
+InitSinLUT{}
+InitCircularPath{}
 InitTiles{}
 InitShip{}
-InitEnemy01{}
+LoadAliensGfx{}
 InitializePalette{}
 InitCopper{}
 InitMap{}
@@ -413,26 +540,32 @@ InitMap{}
 ;******************************************************************************
 ; MAIN LOOP
 ;******************************************************************************
-; ripete main loop finchè non viene premuto il tasto del mouse
-While Joyb(0)=0
+; ripete main loop finchè non viene premuto il tasto ESC
+Repeat
+    VWait
+    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0,#BITMAP_FOREGROUND+db,32,0
+    db=1-db
     
-    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0,#BITMAP_FOREGROUND,32,0
-
     ScrollMap{}
     
-    UnQueue #QUEUE_ID
+    UnQueue (#QUEUE_ID+db)
 
     MoveShip{}
     DrawShip{}
 
-    StartWave{}
+    StartNewWave{}
     ProcessAliens{}
-    DrawEnemies{}
+    DrawAliens{}
 
-    ; attende il vertical blank
-    VWait
-Wend
+    
+Until  RawStatus(#KEY_ESC) = True
 
+
+;******************************************************************************
+; DATI
+;******************************************************************************
+
+; mappa del livello 1
 mapData:
 ; line 0
 Data.w  $0000, $0000, $0000, $0000, $0000, $8000, $8000, $8000, $8000, $E000, $E000, $E000, $E000, $0000, $0000, $0000
@@ -662,17 +795,20 @@ Data  32771,32772,32773,32774,32775,32776,32769,32770,32771,32772,32808,32809,32
 Data  32834,32835,32769,32770,32771,32772,32777,32778,32779,32780,32769,32770,32771,32772,32773,32774
 Data  32775,32776,32777,32778,32779,32780,32769,32770,32771,32772,32932,32933
 
+; wave di alieni
 wavesData:
 ; wave 0 - enemy01
-Data  4                     ; numEnemies
-Data  352,40                ; x,y
+Data  6                     ; numEnemies
+Data  352,80                ; x,y
 Data  8                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,19                 ; width,height
+Data  510                   ; shapeID #SHAPE_ENEMY01
 Data  22                    ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
-Data  0                     ; pathType WAVE_PATH_LINEAR
+Data  2                     ; pathType WAVE_PATH_LINEAR WAVE_PATH_SIN
+
 End
 
