@@ -30,12 +30,14 @@ DEFTYPE .w
 #BITMAP_TILES = 3
 #BITMAP_SHIP = 4
 #BITMAP_ENEMY01 = 5
+#BITMAP_ENEMY02 = 6
 
 #PALETTE_MAIN = 0
 
 #SHAPE_TILE = 0
 #SHAPE_SHIP = 500
 #SHAPE_ENEMY01 = 510
+#SHAPE_ENEMY02 = 520
 
 #QUEUE_ID = 0
 
@@ -52,7 +54,7 @@ DEFTYPE .w
 #SHIP_ANIM_DOWN = 2
 #SHIP_SPEED = 2
 
-#WAVES_NUM = 1
+#WAVES_NUM = 2
 #WAVE_PATH_LINEAR   = 0
 #WAVE_PATH_SIN      = 1
 #WAVE_PATH_CIRCLE   = 2
@@ -123,9 +125,9 @@ currentWavePathType.b = 0
 waveStarted.b = False
 currentWaveY.w = 0
 Dim sinLUT.f(353)
-
 Dim circularPath.Vector2(715)
 aliensInactiveCount = 0
+
 db=0
 
 ;******************************************************************************
@@ -234,9 +236,22 @@ Statement LoadEnemy01Gfx{}
 End Statement
 
 
+; carica la grafica di Enemy02
+Statement LoadEnemy02Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY02,32,21,4
+    LoadBitMap #BITMAP_ENEMY02,"enemy02.iff"
+
+    Use BitMap #BITMAP_ENEMY02
+    GetaShape #SHAPE_ENEMY02,0,0,32,21
+    Free BitMap #BITMAP_ENEMY01
+End Statement
+
 ; carica la grafica degli alieni
 Statement LoadAliensGfx{}
     LoadEnemy01Gfx{}
+    LoadEnemy02Gfx{}
 End Statement
 
 
@@ -445,6 +460,7 @@ Statement StartNewWave{}
                 aliens(j)\pause     = waves(i)\pause*(j+1)
                 aliens(j)\pathOffset = 0
             Next
+            
         EndIf
     Next
 End Statement
@@ -500,7 +516,8 @@ Statement ProcessAliens{}
 
         ; condizione di fine wave, che consente di avviare una nuova wave
         If (aliensInactiveCount = currentWaveNumEnemies) And (currentWaveNumEnemies > 0)
-            waveStarted = False    
+            waveStarted = False
+            aliensInactiveCount = 0   
         EndIf
     EndIf
 End Statement
@@ -798,8 +815,8 @@ Data  32775,32776,32777,32778,32779,32780,32769,32770,32771,32772,32932,32933
 ; wave di alieni
 wavesData:
 ; wave 0 - enemy01
-Data  6                     ; numEnemies
-Data  352,80                ; x,y
+Data  4                     ; numEnemies
+Data  352,40                ; x,y
 Data  8                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -808,7 +825,19 @@ Data  510                   ; shapeID #SHAPE_ENEMY01
 Data  22                    ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
-Data  2                     ; pathType WAVE_PATH_LINEAR WAVE_PATH_SIN
+Data  0                     ; pathType WAVE_PATH_LINEAR
+; wave 1 - enemy02
+Data  6                     ; numEnemies
+Data  352,80                ; x,y
+Data  1                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,21                 ; width,height
+Data  520                   ; shapeID #SHAPE_ENEMY02
+Data  40                    ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  1                     ; pathType WAVE_PATH_SIN
 
 End
 
