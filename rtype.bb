@@ -31,6 +31,10 @@ DEFTYPE .w
 #BITMAP_SHIP = 4
 #BITMAP_ENEMY01 = 5
 #BITMAP_ENEMY02 = 6
+#BITMAP_ENEMY03 = 7
+#BITMAP_ENEMY04 = 8
+#BITMAP_ENEMY05 = 9
+#BITMAP_ENEMY06 = 10
 
 #PALETTE_MAIN = 0
 
@@ -38,6 +42,10 @@ DEFTYPE .w
 #SHAPE_SHIP = 500
 #SHAPE_ENEMY01 = 510
 #SHAPE_ENEMY02 = 520
+#SHAPE_ENEMY03 = 529
+#SHAPE_ENEMY04 = 530
+#SHAPE_ENEMY05 = 540
+#SHAPE_ENEMY06 = 550
 
 #QUEUE_ID = 0
 
@@ -54,7 +62,7 @@ DEFTYPE .w
 #SHIP_ANIM_DOWN = 2
 #SHIP_SPEED = 2
 
-#WAVES_NUM = 2
+#WAVES_NUM = 8
 #WAVE_PATH_LINEAR   = 0
 #WAVE_PATH_SIN      = 1
 #WAVE_PATH_CIRCLE   = 2
@@ -225,7 +233,7 @@ Statement LoadEnemy01Gfx{}
     LoadBitMap #BITMAP_ENEMY01,"enemy01.iff"
 
     Use BitMap #BITMAP_ENEMY01
-    ; crea una shape per ogni tile
+    ; crea una shape per ogni frame
     i=#SHAPE_ENEMY01
     For x=0 To 255 Step 32
         GetaShape i,x,0,32,19
@@ -245,13 +253,86 @@ Statement LoadEnemy02Gfx{}
 
     Use BitMap #BITMAP_ENEMY02
     GetaShape #SHAPE_ENEMY02,0,0,32,21
-    Free BitMap #BITMAP_ENEMY01
+
+    Free BitMap #BITMAP_ENEMY02
 End Statement
+
+
+; carica la grafica di Enemy03
+Statement LoadEnemy03Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY03,32,22,4
+    LoadBitMap #BITMAP_ENEMY03,"enemy03.iff"
+
+    Use BitMap #BITMAP_ENEMY03
+    GetaShape #SHAPE_ENEMY03,0,0,32,22
+    Free BitMap #BITMAP_ENEMY03
+End Statement
+
+
+; carica la grafica di Enemy04
+Statement LoadEnemy04Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY04,128,26,4
+    LoadBitMap #BITMAP_ENEMY04,"enemy04.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_ENEMY04
+    For x=0 To 127 Step 32
+        GetaShape i,x,0,32,26
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_ENEMY04
+End Statement
+
+
+; carica la grafica di Enemy05
+Statement LoadEnemy05Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY05,96,26,4
+    LoadBitMap #BITMAP_ENEMY05,"enemy05.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_ENEMY05
+    For x=0 To 95 Step 32
+        GetaShape i,x,0,32,26
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_ENEMY05
+End Statement
+
+
+; carica la grafica di Enemy06
+Statement LoadEnemy06Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY06,192,26,4
+    LoadBitMap #BITMAP_ENEMY06,"enemy07.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_ENEMY06
+    For x=0 To 191 Step 32
+        GetaShape i,x,0,32,26
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_ENEMY06
+End Statement
+
 
 ; carica la grafica degli alieni
 Statement LoadAliensGfx{}
     LoadEnemy01Gfx{}
     LoadEnemy02Gfx{}
+    LoadEnemy03Gfx{}
+    LoadEnemy04Gfx{}
+    LoadEnemy05Gfx{}
+    LoadEnemy06Gfx{}
 End Statement
 
 
@@ -457,7 +538,7 @@ Statement StartNewWave{}
                 aliens(j)\height    = waves(i)\alien\height
                 aliens(j)\state     = waves(i)\alien\state
                 aliens(j)\shapeID   = waves(i)\alien\shapeID
-                aliens(j)\pause     = waves(i)\pause*(j+1)
+                aliens(j)\pause     = waves(i)\pause*j
                 aliens(j)\pathOffset = 0
             Next
             
@@ -838,6 +919,78 @@ Data  40                    ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
 Data  1                     ; pathType WAVE_PATH_SIN
+; wave 2 - enemy04
+Data  1                     ; numEnemies
+Data  352,150               ; x,y
+Data  4                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,26                 ; width,height
+Data  530                   ; shapeID #SHAPE_ENEMY04
+Data  57                    ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  0                     ; pathType WAVE_PATH_LINEAR
+; wave 3 - enemy02
+Data  6                     ; numEnemies
+Data  352,80                ; x,y
+Data  1                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,21                 ; width,height
+Data  520                   ; shapeID #SHAPE_ENEMY02
+Data  70                    ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  1                     ; pathType WAVE_PATH_SIN
+; wave 4 - enemy03
+Data  1                     ; numEnemies
+Data  352,80                ; x,y
+Data  1                     ; numFrames
+Data  10                    ; animDelay
+Data  2                     ; speed
+Data  32,22                 ; width,height
+Data  529                   ; shapeID #SHAPE_ENEMY03
+Data  87                    ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  1                     ; pathType WAVE_PATH_SIN
+; wave 5 - enemy06
+Data  1                     ; numEnemies
+Data  352,150               ; x,y
+Data  6                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,26                 ; width,height
+Data  550                   ; shapeID #SHAPE_ENEMY06
+Data  96                    ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  0                     ; pathType WAVE_PATH_LINEAR
+; wave 6 - enemy03
+Data  1                     ; numEnemies
+Data  352,95                ; x,y
+Data  1                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,22                 ; width,height
+Data  529                   ; shapeID #SHAPE_ENEMY03
+Data  109                   ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  1                     ; pathType WAVE_PATH_SIN
+; wave 7 - enemy05
+Data  4                     ; numEnemies
+Data  352,30                ; x,y
+Data  3                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,26                 ; width,height
+Data  540                   ; shapeID #SHAPE_ENEMY05
+Data  123                   ; mapOffset
+Data  40                    ; pause
+Data  30                    ; yoffset
+Data  0                     ; pathType WAVE_PATH_LINEAR
 
 End
 
