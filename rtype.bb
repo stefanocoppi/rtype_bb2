@@ -51,8 +51,10 @@ DEFTYPE .w
 
 #BACKGROUND_WIDTH = 704
 #BACKGROUND_HEIGHT = 256
-#FOREGROUND_WIDTH = 384
+#FOREGROUND_CLIP_AREA_W = 48
+#FOREGROUND_WIDTH = 320 + 2*#FOREGROUND_CLIP_AREA_W ; 384
 #FOREGROUND_HEIGHT = 256
+
 #BPP = 4
 
 #SHIP_X0 = 64
@@ -132,7 +134,7 @@ currentWaveNumEnemies.b = 0
 currentWavePathType.b = 0
 waveStarted.b = False
 currentWaveY.w = 0
-Dim sinLUT.f(353)
+Dim sinLUT.f(370)
 Dim circularPath.Vector2(715)
 aliensInactiveCount = 0
 
@@ -190,7 +192,7 @@ End Statement
 Statement InitSinLUT{}
     Shared sinLUT()
 
-    For x=0 To 352
+    For x=0 To 369
         s.f = Sin(x*Pi/180)
         sinLUT(x) = s
     Next
@@ -462,7 +464,7 @@ Statement MoveShip{}
     myShip\x = myShip\x + Joyx(1)*#SHIP_SPEED
     myShip\y = myShip\y + Joyy(1)*#SHIP_SPEED
 
-    myShip\x = QLimit( myShip\x,32,320)
+    myShip\x = QLimit( myShip\x,#FOREGROUND_CLIP_AREA_W,#FOREGROUND_CLIP_AREA_W+320-32)
     myShip\y = QLimit( myShip\y,0,176)
 
     myShip\animState = Joyy(1) + 1
@@ -573,6 +575,7 @@ Statement ProcessAliens{}
                             aliens(i)\x = aliens(i)\x - aliens(i)\speed
                         Case #WAVE_PATH_SIN
                             aliens(i)\x = aliens(i)\x - aliens(i)\speed
+                            aliens(i)\x = QLimit(aliens(i)\x,0,369)
                             y.f = 30*sinLUT(aliens(i)\x)
                             aliens(i)\y = currentWaveY+y
                         Case #WAVE_PATH_CIRCLE
@@ -583,7 +586,7 @@ Statement ProcessAliens{}
                             EndIf
                     End Select
 
-                    aliens(i)\x = QLimit(aliens(i)\x,0,352)
+                    aliens(i)\x = QLimit(aliens(i)\x,0,369)
                     aliens(i)\y = QLimit(aliens(i)\y,0,160)
                 EndIf
                 
@@ -641,7 +644,7 @@ InitMap{}
 ; ripete main loop finchè non viene premuto il tasto ESC
 Repeat
     VWait
-    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0,#BITMAP_FOREGROUND+db,32,0
+    DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0,#BITMAP_FOREGROUND+db,#FOREGROUND_CLIP_AREA_W,0
     db=1-db
     
     ScrollMap{}
@@ -897,7 +900,7 @@ Data  32775,32776,32777,32778,32779,32780,32769,32770,32771,32772,32932,32933
 wavesData:
 ; wave 0 - enemy01
 Data  4                     ; numEnemies
-Data  352,40                ; x,y
+Data  369,40                ; x,y
 Data  8                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -909,7 +912,7 @@ Data  30                    ; yoffset
 Data  0                     ; pathType WAVE_PATH_LINEAR
 ; wave 1 - enemy02
 Data  6                     ; numEnemies
-Data  352,80                ; x,y
+Data  369,80                ; x,y
 Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -921,7 +924,7 @@ Data  0                     ; yoffset
 Data  1                     ; pathType WAVE_PATH_SIN
 ; wave 2 - enemy04
 Data  1                     ; numEnemies
-Data  352,150               ; x,y
+Data  369,150               ; x,y
 Data  4                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -933,7 +936,7 @@ Data  0                     ; yoffset
 Data  0                     ; pathType WAVE_PATH_LINEAR
 ; wave 3 - enemy02
 Data  6                     ; numEnemies
-Data  352,80                ; x,y
+Data  369,80                ; x,y
 Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -945,7 +948,7 @@ Data  0                     ; yoffset
 Data  1                     ; pathType WAVE_PATH_SIN
 ; wave 4 - enemy03
 Data  1                     ; numEnemies
-Data  352,80                ; x,y
+Data  369,80                ; x,y
 Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  2                     ; speed
@@ -957,7 +960,7 @@ Data  0                     ; yoffset
 Data  1                     ; pathType WAVE_PATH_SIN
 ; wave 5 - enemy06
 Data  1                     ; numEnemies
-Data  352,150               ; x,y
+Data  369,150               ; x,y
 Data  6                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -969,7 +972,7 @@ Data  0                     ; yoffset
 Data  0                     ; pathType WAVE_PATH_LINEAR
 ; wave 6 - enemy03
 Data  1                     ; numEnemies
-Data  352,95                ; x,y
+Data  369,95                ; x,y
 Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
@@ -981,7 +984,7 @@ Data  0                     ; yoffset
 Data  1                     ; pathType WAVE_PATH_SIN
 ; wave 7 - enemy05
 Data  4                     ; numEnemies
-Data  352,30                ; x,y
+Data  369,30                ; x,y
 Data  3                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
