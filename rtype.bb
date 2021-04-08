@@ -8,6 +8,15 @@
 ; (c) 2021 Stefano Coppi
 ;******************************************************************************
 
+;******************************************************************************
+; Compiler Options:
+;
+; Runtime error debugger: off
+; Create Debug info for executable: off
+; Bitmaps 20
+; Shapes 600
+;******************************************************************************
+
 ; consente l'esecuzione da Workbench
 WBStartup
 
@@ -35,6 +44,8 @@ DEFTYPE .w
 #BITMAP_ENEMY04 = 8
 #BITMAP_ENEMY05 = 9
 #BITMAP_ENEMY06 = 10
+#BITMAP_ENEMY08 = 12
+#BITMAP_ENEMY09 = 13
 
 #PALETTE_MAIN = 0
 
@@ -46,6 +57,8 @@ DEFTYPE .w
 #SHAPE_ENEMY04 = 530
 #SHAPE_ENEMY05 = 540
 #SHAPE_ENEMY06 = 550
+#SHAPE_ENEMY08 = 570
+#SHAPE_ENEMY09 = 580
 
 #QUEUE_ID = 0
 
@@ -64,7 +77,7 @@ DEFTYPE .w
 #SHIP_ANIM_DOWN = 2
 #SHIP_SPEED = 2
 
-#WAVES_NUM = 8
+#WAVES_NUM = 10
 #WAVE_PATH_LINEAR   = 0
 #WAVE_PATH_SIN      = 1
 #WAVE_PATH_CIRCLE   = 2
@@ -135,7 +148,7 @@ currentWavePathType.b = 0
 waveStarted.b = False
 currentWaveY.w = 0
 Dim sinLUT.f(370)
-Dim circularPath.Vector2(715)
+Dim circularPath.Vector2(732)
 aliensInactiveCount = 0
 
 db=0
@@ -204,8 +217,8 @@ Statement InitCircularPath{}
     Shared circularPath()
 
     ; ingresso nello schermo
-    For i=0 To 80
-        circularPath(i)\x = 352-i
+    For i=0 To 97
+        circularPath(i)\x = 369-i
         circularPath(i)\y = 84
     Next
 
@@ -327,6 +340,42 @@ Statement LoadEnemy06Gfx{}
 End Statement
 
 
+; carica la grafica di Enemy08 (Robot arancione)
+Statement LoadEnemy08Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY08,240,43,4
+    LoadBitMap #BITMAP_ENEMY08,"enemy08.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_ENEMY08
+    For x=0 To 239 Step 48
+        GetaShape i,x,0,48,43
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_ENEMY08
+End Statement
+
+
+; carica la grafica di Enemy09 (serpentone circolare)
+Statement LoadEnemy09Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ENEMY09,256,27,4
+    LoadBitMap #BITMAP_ENEMY09,"enemy09.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_ENEMY09
+    For x=0 To 255 Step 32
+        GetaShape i,x,0,32,27
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_ENEMY09
+End Statement
+
+
 ; carica la grafica degli alieni
 Statement LoadAliensGfx{}
     LoadEnemy01Gfx{}
@@ -335,6 +384,8 @@ Statement LoadAliensGfx{}
     LoadEnemy04Gfx{}
     LoadEnemy05Gfx{}
     LoadEnemy06Gfx{}
+    LoadEnemy08Gfx{}
+    LoadEnemy09Gfx{}
 End Statement
 
 
@@ -579,7 +630,7 @@ Statement ProcessAliens{}
                             y.f = 30*sinLUT(aliens(i)\x)
                             aliens(i)\y = currentWaveY+y
                         Case #WAVE_PATH_CIRCLE
-                            If aliens(i)\pathOffset <= 715
+                            If aliens(i)\pathOffset <= 732
                                 aliens(i)\x = circularPath(aliens(i)\pathOffset)\x
                                 aliens(i)\y = circularPath(aliens(i)\pathOffset)\y
                                 aliens(i)\pathOffset = aliens(i)\pathOffset+1
@@ -991,6 +1042,30 @@ Data  1                     ; speed
 Data  32,26                 ; width,height
 Data  540                   ; shapeID #SHAPE_ENEMY05
 Data  123                   ; mapOffset
+Data  40                    ; pause
+Data  30                    ; yoffset
+Data  0                     ; pathType WAVE_PATH_LINEAR
+; wave 8 - enemy09 (serpentone circolare)
+Data  8                     ; numEnemies
+Data  369,95                ; x,y
+Data  8                     ; numFrames
+Data  5                     ; animDelay
+Data  1                     ; speed
+Data  32,27                 ; width,height
+Data  580                   ; shapeID #SHAPE_ENEMY09 580
+Data  159                   ; mapOffset
+Data  28                    ; pause
+Data  0                     ; yoffset
+Data  2                     ; pathType #WAVE_PATH_CIRCLE
+; wave 9 - enemy08 (Robot arancione)
+Data  1                     ; numEnemies
+Data  369,134               ; x,y
+Data  5                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  48,43                 ; width,height
+Data  570                   ; shapeID #SHAPE_ENEMY08
+Data  234                   ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
 Data  0                     ; pathType WAVE_PATH_LINEAR
