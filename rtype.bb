@@ -77,7 +77,7 @@ DEFTYPE .w
 #SHIP_ANIM_DOWN = 2
 #SHIP_SPEED = 2
 
-#WAVES_NUM = 10
+#WAVES_NUM = 13
 #WAVE_PATH_LINEAR   = 0
 #WAVE_PATH_SIN      = 1
 #WAVE_PATH_CIRCLE   = 2
@@ -1045,7 +1045,19 @@ Data  123                   ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
 Data  0                     ; pathType WAVE_PATH_LINEAR
-; wave 8 - enemy09 (serpentone circolare)
+; wave 8 - enemy05
+Data  3                     ; numEnemies
+Data  369,50                ; x,y
+Data  3                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,26                 ; width,height
+Data  540                   ; shapeID #SHAPE_ENEMY05
+Data  139                   ; mapOffset
+Data  40                    ; pause
+Data  30                    ; yoffset
+Data  0                     ; pathType WAVE_PATH_LINEAR
+; wave 9 - enemy09 (serpentone circolare)
 Data  8                     ; numEnemies
 Data  369,95                ; x,y
 Data  8                     ; numFrames
@@ -1057,7 +1069,31 @@ Data  159                   ; mapOffset
 Data  28                    ; pause
 Data  0                     ; yoffset
 Data  2                     ; pathType #WAVE_PATH_CIRCLE
-; wave 9 - enemy08 (Robot arancione)
+; wave 10 - enemy02
+Data  6                     ; numEnemies
+Data  369,96                ; x,y
+Data  1                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,21                 ; width,height
+Data  520                   ; shapeID #SHAPE_ENEMY02
+Data  192                   ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  1                     ; pathType WAVE_PATH_SIN
+; wave 11 - enemy03
+Data  1                     ; numEnemies
+Data  369,95                ; x,y
+Data  1                     ; numFrames
+Data  10                    ; animDelay
+Data  1                     ; speed
+Data  32,22                 ; width,height
+Data  529                   ; shapeID #SHAPE_ENEMY03
+Data  217                   ; mapOffset
+Data  30                    ; pause
+Data  0                     ; yoffset
+Data  1                     ; pathType WAVE_PATH_SIN
+; wave 12 - enemy08 (Robot arancione)
 Data  1                     ; numEnemies
 Data  369,134               ; x,y
 Data  5                     ; numFrames
