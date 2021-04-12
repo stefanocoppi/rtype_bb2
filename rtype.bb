@@ -11,7 +11,7 @@
 ;******************************************************************************
 ; Compiler Options:
 ;
-; Runtime error debugger: off
+; Runtime error debugger: off (solo in release mode)
 ; Create Debug info for executable: off
 ; Bitmaps 20
 ; Shapes 600
@@ -87,6 +87,10 @@ DEFTYPE .w
 #ALIENS_STATE_ACTIVE = 0
 #ALIENS_STATE_INACTIVE = 1
 
+#MAX_BULLETS = 5
+#FIRE_DELAY  = 20
+#BULLET_STATE_INACTIVE = 0
+#BULLET_STATE_ACTIVE   = 1
 
 ;******************************************************************************
 ; TIPI DI DATO
@@ -129,6 +133,13 @@ NEWTYPE .AlienWave
     pathType.b          ; tipologia di path seguito dagli alieni
 End NEWTYPE
 
+; proiettile
+NEWTYPE .Bullet
+    x.w
+    y.w
+    state.b
+End NEWTYPE
+
 ;******************************************************************************
 ; VARIABILI
 ;******************************************************************************
@@ -152,6 +163,8 @@ Dim circularPath.Vector2(732)
 aliensInactiveCount = 0
 
 db=0
+
+Dim bullets.Bullet(#MAX_BULLETS)
 
 ;******************************************************************************
 ; Procedure
@@ -671,6 +684,42 @@ Statement DrawAliens{}
 End Statement
 
 
+; carica la grafica dei bullets
+Statement LoadBulletsGfx{}
+    ; Not implemented yet.
+End Statement
+
+
+; controlla la pressione del tasto fire del joystick e spara i bullets
+Statement CheckFire{}
+    ; incrementa delay
+    ; se è stato premuto il tasto fire del joystick 2
+    ;       se è trascorso il FIRE_DELAY
+    ;               azzera il delay
+    ;               cerca il primo bullet inattivo nell'array bullets
+    ;               se c'è un bullet inattivo
+    ;                       crea un bullet attivo alla posizione dello ship
+End Statement
+
+
+; disegna i bullets
+Statement DrawBullets{}
+    ; cicla sull'array bullets
+    ;       se il bullet corrente è attivo
+    ;           disegna il bullet
+End Statement
+
+
+; sposta i bullets e aggiorna lo stato
+Statement MoveBullets{}
+    ; cicla sull'array bullets
+    ;       se il bullet corrente è attivo
+    ;               x=x+speed
+    ;               se x è fuori schermo
+    ;                       rende il bullet inattivo
+End Statement
+
+
 ;******************************************************************************
 ; MAIN
 ;******************************************************************************
@@ -684,6 +733,7 @@ InitCircularPath{}
 InitTiles{}
 InitShip{}
 LoadAliensGfx{}
+LoadBulletsGfx{}
 InitializePalette{}
 InitCopper{}
 InitMap{}
@@ -703,7 +753,11 @@ Repeat
     UnQueue (#QUEUE_ID+db)
 
     MoveShip{}
+    CheckFire{}
     DrawShip{}
+
+    MoveBullets{}
+    DrawBullets{}
 
     StartNewWave{}
     ProcessAliens{}
