@@ -143,6 +143,7 @@ NEWTYPE .Bullet
     x.w
     y.w
     state.b
+    shapeID.w
 End NEWTYPE
 
 ;******************************************************************************
@@ -165,7 +166,7 @@ waveStarted.b = False
 currentWaveY.w = 0
 Dim sinLUT.f(370)
 Dim circularPath.Vector2(732)
-aliensInactiveCount = 0
+
 
 db=0
 
@@ -640,8 +641,9 @@ End Statement
 ; processa il movimento degli alieni della wave corrente
 Statement ProcessAliens{}
     Shared aliens(),currentWaveNumEnemies,currentWavePathType,waveStarted,sinLUT(),currentWaveY
-    Shared cosLUT(),sinLUT2(),circularPath(),aliensInactiveCount
+    Shared cosLUT(),sinLUT2(),circularPath()
 
+    aliensInactiveCount = 0
     If waveStarted = True
         For i=0 To currentWaveNumEnemies -1
             If aliens(i)\state = #ALIENS_STATE_ACTIVE
@@ -681,15 +683,15 @@ Statement ProcessAliens{}
                 ; se x=0 allora cambia lo stato dell'alieno in inattivo
                 If aliens(i)\x = 0
                     aliens(i)\state = #ALIENS_STATE_INACTIVE
-                    aliensInactiveCount = aliensInactiveCount + 1
                 EndIf
+            Else
+                aliensInactiveCount = aliensInactiveCount + 1
             EndIf
         Next
 
         ; condizione di fine wave, che consente di avviare una nuova wave
         If (aliensInactiveCount = currentWaveNumEnemies) And (currentWaveNumEnemies > 0)
-            waveStarted = False
-            aliensInactiveCount = 0   
+            waveStarted = False  
         EndIf
     EndIf
 End Statement
@@ -702,7 +704,9 @@ Statement DrawAliens{}
     Use BitMap #BITMAP_FOREGROUND+db
 
     For i=0 To currentWaveNumEnemies-1
-        QBlit #QUEUE_ID+db,aliens(i)\shapeID+aliens(i)\currFrame,aliens(i)\x,aliens(i)\y
+        If aliens(i)\state = #ALIENS_STATE_ACTIVE
+            QBlit #QUEUE_ID+db,aliens(i)\shapeID+aliens(i)\currFrame,aliens(i)\x,aliens(i)\y
+        EndIf
     Next
 
 End Statement
@@ -730,6 +734,7 @@ Statement CheckFire{}
             If inactiveIndex>-1
                 ; crea un bullet attivo alla posizione dello ship
                 bullets(inactiveIndex)\state = #BULLET_STATE_ACTIVE
+                bullets(inactiveIndex)\shapeID = #SHAPE_FIRE01
                 bullets(inactiveIndex)\x = myShip\x + 32 - 6
                 bullets(inactiveIndex)\y = myShip\y + 6 + 2
             EndIf
@@ -771,6 +776,33 @@ Statement MoveBullets{}
                 ; rende il bullet inattivo
                 bullets(i)\state = #BULLET_STATE_INACTIVE
             EndIf
+        EndIf
+    Next
+End Statement
+
+
+; controlla le collisioni tra bullets e aliens
+Statement CheckCollBulletsAliens{}
+    Shared bullets(),currentWaveNumEnemies,aliens()
+
+    ; ciclo sui bullets
+    For i=0 To #MAX_BULLETS-1
+        ; se il bullet corrente è attivo
+        If bullets(i)\state = #BULLET_STATE_ACTIVE
+            ; ciclo sugli alieni
+            For j=0 To currentWaveNumEnemies-1
+                ; se l'alieno corrente è attivo
+                If aliens(j)\state = #ALIENS_STATE_ACTIVE
+                     ; se c'è collisione tra bullet ed alieno correnti
+                    If ShapesHit(bullets(i)\shapeID,bullets(i)\x,bullets(i)\y,aliens(j)\shapeID,aliens(j)\x,aliens(j)\y) = True
+                        ; rende inattivo il bullet
+                        bullets(i)\state = #BULLET_STATE_INACTIVE
+                        ; cambia lo stato dell'alieno in colpito
+                        aliens(j)\state = #ALIENS_STATE_INACTIVE
+                        ; incrementa il punteggio    
+                    EndIf
+                EndIf
+            Next
         EndIf
     Next
 End Statement
@@ -819,6 +851,7 @@ Repeat
     ProcessAliens{}
     DrawAliens{}
 
+    CheckCollBulletsAliens{}
     
 Until  RawStatus(#KEY_ESC) = True
 
