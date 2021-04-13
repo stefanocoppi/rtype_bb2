@@ -46,6 +46,7 @@ DEFTYPE .w
 #BITMAP_ENEMY06 = 10
 #BITMAP_ENEMY08 = 12
 #BITMAP_ENEMY09 = 13
+#BITMAP_FIRE01  = 14
 
 #PALETTE_MAIN = 0
 
@@ -59,6 +60,7 @@ DEFTYPE .w
 #SHAPE_ENEMY06 = 550
 #SHAPE_ENEMY08 = 570
 #SHAPE_ENEMY09 = 580
+#SHAPE_FIRE01  = 590
 
 #QUEUE_ID = 0
 
@@ -88,9 +90,12 @@ DEFTYPE .w
 #ALIENS_STATE_INACTIVE = 1
 
 #MAX_BULLETS = 5
-#FIRE_DELAY  = 20
+#FIRE_DELAY  = 7
+#BULLETS_SPEED = 4
 #BULLET_STATE_INACTIVE = 0
 #BULLET_STATE_ACTIVE   = 1
+
+
 
 ;******************************************************************************
 ; TIPI DI DATO
@@ -165,6 +170,7 @@ aliensInactiveCount = 0
 db=0
 
 Dim bullets.Bullet(#MAX_BULLETS)
+fireDelay = 0
 
 ;******************************************************************************
 ; Procedure
@@ -399,6 +405,24 @@ Statement LoadAliensGfx{}
     LoadEnemy06Gfx{}
     LoadEnemy08Gfx{}
     LoadEnemy09Gfx{}
+End Statement
+
+
+; carica la grafica del bullet di base dello ship (fire01)
+Statement LoadBullet01Gfx{}
+    ; bitmap contenente i frames
+    BitMap #BITMAP_FIRE01,17,4,4
+    LoadBitMap #BITMAP_FIRE01,"fire01.iff"
+
+    Use BitMap #BITMAP_FIRE01
+    GetaShape #SHAPE_FIRE01,0,0,17,4
+    Free BitMap #BITMAP_FIRE01
+End Statement
+
+
+; carica la grafica dei bullets
+Statement LoadBulletsGfx{}
+    LoadBullet01Gfx{}
 End Statement
 
 
@@ -684,39 +708,71 @@ Statement DrawAliens{}
 End Statement
 
 
-; carica la grafica dei bullets
-Statement LoadBulletsGfx{}
-    ; Not implemented yet.
-End Statement
-
-
 ; controlla la pressione del tasto fire del joystick e spara i bullets
 Statement CheckFire{}
-    ; incrementa delay
-    ; se è stato premuto il tasto fire del joystick 2
-    ;       se è trascorso il FIRE_DELAY
-    ;               azzera il delay
-    ;               cerca il primo bullet inattivo nell'array bullets
-    ;               se c'è un bullet inattivo
-    ;                       crea un bullet attivo alla posizione dello ship
+    Shared fireDelay,myShip,bullets()
+
+    ; incrementa delay tra due emissioni di bullets
+    fireDelay = fireDelay + 1
+
+    ; se è stato premuto il tasto fire del joystick in porta 1
+    If Joyb(1) = 1
+        ; se è trascorso il FIRE_DELAY
+        If fireDelay >= #FIRE_DELAY
+            ; azzera il delay
+            fireDelay = 0
+            ; cerca l'ultimo bullet inattivo nell'array bullets
+            inactiveIndex = -1
+            For i=0 To #MAX_BULLETS-1
+                If bullets(i)\state = #BULLET_STATE_INACTIVE Then inactiveIndex = i
+            Next
+            ; se c'è un bullet inattivo
+            If inactiveIndex>-1
+                ; crea un bullet attivo alla posizione dello ship
+                bullets(inactiveIndex)\state = #BULLET_STATE_ACTIVE
+                bullets(inactiveIndex)\x = myShip\x + 32 - 6
+                bullets(inactiveIndex)\y = myShip\y + 6 + 2
+            EndIf
+        EndIf
+    EndIf
 End Statement
 
 
 ; disegna i bullets
 Statement DrawBullets{}
+    Shared bullets(),db
+
+    ; seleziona la bitmap su cui disegnare
+    Use BitMap #BITMAP_FOREGROUND+db
+
     ; cicla sull'array bullets
-    ;       se il bullet corrente è attivo
-    ;           disegna il bullet
+    For i=0 To #MAX_BULLETS-1
+        ; se il bullet corrente è attivo
+        If bullets(i)\state = #BULLET_STATE_ACTIVE
+            ; disegna il bullet
+            QBlit #QUEUE_ID+db,#SHAPE_FIRE01,bullets(i)\x,bullets(i)\y
+        EndIf
+    Next
 End Statement
 
 
 ; sposta i bullets e aggiorna lo stato
 Statement MoveBullets{}
+    Shared bullets()
+
     ; cicla sull'array bullets
-    ;       se il bullet corrente è attivo
-    ;               x=x+speed
-    ;               se x è fuori schermo
-    ;                       rende il bullet inattivo
+    For i=0 To #MAX_BULLETS-1
+        ; se il bullet corrente è attivo
+        If bullets(i)\state = #BULLET_STATE_ACTIVE
+            ; somma alla x la velocità
+            bullets(i)\x = bullets(i)\x + #BULLETS_SPEED
+            ; se x è fuori schermo
+            If bullets(i)\x >= (48+320)
+                ; rende il bullet inattivo
+                bullets(i)\state = #BULLET_STATE_INACTIVE
+            EndIf
+        EndIf
+    Next
 End Statement
 
 
