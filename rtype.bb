@@ -47,20 +47,24 @@ DEFTYPE .w
 #BITMAP_ENEMY08 = 12
 #BITMAP_ENEMY09 = 13
 #BITMAP_FIRE01  = 14
+#BITMAP_EXPL01  = 15
+#BITMAP_EXPL02  = 16
 
 #PALETTE_MAIN = 0
 
 #SHAPE_TILE = 0
-#SHAPE_SHIP = 500
-#SHAPE_ENEMY01 = 510
-#SHAPE_ENEMY02 = 520
-#SHAPE_ENEMY03 = 529
-#SHAPE_ENEMY04 = 530
-#SHAPE_ENEMY05 = 540
-#SHAPE_ENEMY06 = 550
-#SHAPE_ENEMY08 = 570
-#SHAPE_ENEMY09 = 580
-#SHAPE_FIRE01  = 590
+#SHAPE_SHIP = 440
+#SHAPE_ENEMY01 = 450
+#SHAPE_ENEMY02 = 460
+#SHAPE_ENEMY03 = 470
+#SHAPE_ENEMY04 = 480
+#SHAPE_ENEMY05 = 490
+#SHAPE_ENEMY06 = 500
+#SHAPE_ENEMY08 = 510
+#SHAPE_ENEMY09 = 520
+#SHAPE_FIRE01  = 530
+#SHAPE_EXPL01  = 540
+#SHAPE_EXPL02  = 550
 
 #QUEUE_ID = 0
 
@@ -86,8 +90,9 @@ DEFTYPE .w
 
 #MAX_ENEMIES = 8
 
-#ALIENS_STATE_ACTIVE = 0
+#ALIENS_STATE_ACTIVE   = 0
 #ALIENS_STATE_INACTIVE = 1
+#ALIENS_STATE_HIT      = 2
 
 #MAX_BULLETS = 5
 #FIRE_DELAY  = 7
@@ -185,7 +190,7 @@ Statement InitTiles{}
 
     Use BitMap #BITMAP_TILES
     ; crea una shape per ogni tile
-    i=0
+    i = #SHAPE_TILE
     For y=0 To 351 Step 16
         For x=0 To 319 Step 16
             GetaShape i,x,y,16,16
@@ -396,6 +401,42 @@ Statement LoadEnemy09Gfx{}
 End Statement
 
 
+; carica la grafica per l'expl01 (esplosione degli alieni di grandezza normale)
+Statement LoadExpl01Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_EXPL01,256,30,4
+    LoadBitMap #BITMAP_EXPL01,"expl01.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_EXPL01
+    For x=0 To 255 Step 32
+        GetaShape i,x,0,32,30
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_EXPL01
+End Statement
+
+
+; carica la grafica per l'expl02 (esplosione del robot)
+Statement LoadExpl02Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_EXPL02,528,51,4
+    LoadBitMap #BITMAP_EXPL02,"expl02.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_EXPL02
+    For x=0 To 527 Step 48
+        GetaShape i,x,0,48,51
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_EXPL02
+End Statement
+
+
 ; carica la grafica degli alieni
 Statement LoadAliensGfx{}
     LoadEnemy01Gfx{}
@@ -406,6 +447,8 @@ Statement LoadAliensGfx{}
     LoadEnemy06Gfx{}
     LoadEnemy08Gfx{}
     LoadEnemy09Gfx{}
+    LoadExpl01Gfx{}
+    LoadExpl02Gfx{}
 End Statement
 
 
@@ -646,7 +689,7 @@ Statement ProcessAliens{}
     aliensInactiveCount = 0
     If waveStarted = True
         For i=0 To currentWaveNumEnemies -1
-            If aliens(i)\state = #ALIENS_STATE_ACTIVE
+            If aliens(i)\state <> #ALIENS_STATE_INACTIVE
                 ; attende in caso di pausa >0
                 If aliens(i)\pause > 0
                     aliens(i)\pause = aliens(i)\pause - 1
@@ -656,28 +699,36 @@ Statement ProcessAliens{}
                     If aliens(i)\currDelay = aliens(i)\animDelay
                         aliens(i)\currDelay = 0
                         aliens(i)\currFrame = aliens(i)\currFrame + 1
-                        If aliens(i)\currFrame = aliens(i)\numFrames Then aliens(i)\currFrame = 0
+                        If aliens(i)\currFrame = aliens(i)\numFrames 
+                            If aliens(i)\state = #ALIENS_STATE_HIT
+                                aliens(i)\state = #ALIENS_STATE_INACTIVE
+                            Else
+                                aliens(i)\currFrame = 0
+                            EndIf
+                        EndIf
                     EndIf
 
-                    ; movimento
-                    Select currentWavePathType
-                        Case #WAVE_PATH_LINEAR
-                            aliens(i)\x = aliens(i)\x - aliens(i)\speed
-                        Case #WAVE_PATH_SIN
-                            aliens(i)\x = aliens(i)\x - aliens(i)\speed
-                            aliens(i)\x = QLimit(aliens(i)\x,0,369)
-                            y.f = 30*sinLUT(aliens(i)\x)
-                            aliens(i)\y = currentWaveY+y
-                        Case #WAVE_PATH_CIRCLE
-                            If aliens(i)\pathOffset <= 732
-                                aliens(i)\x = circularPath(aliens(i)\pathOffset)\x
-                                aliens(i)\y = circularPath(aliens(i)\pathOffset)\y
-                                aliens(i)\pathOffset = aliens(i)\pathOffset+1
-                            EndIf
-                    End Select
+                    If aliens(i)\state = #ALIENS_STATE_ACTIVE
+                        ; movimento
+                        Select currentWavePathType
+                            Case #WAVE_PATH_LINEAR
+                                aliens(i)\x = aliens(i)\x - aliens(i)\speed
+                            Case #WAVE_PATH_SIN
+                                aliens(i)\x = aliens(i)\x - aliens(i)\speed
+                                aliens(i)\x = QLimit(aliens(i)\x,0,369)
+                                y.f = 30*sinLUT(aliens(i)\x)
+                                aliens(i)\y = currentWaveY+y
+                            Case #WAVE_PATH_CIRCLE
+                                If aliens(i)\pathOffset <= 732
+                                    aliens(i)\x = circularPath(aliens(i)\pathOffset)\x
+                                    aliens(i)\y = circularPath(aliens(i)\pathOffset)\y
+                                    aliens(i)\pathOffset = aliens(i)\pathOffset+1
+                                EndIf
+                        End Select
 
-                    aliens(i)\x = QLimit(aliens(i)\x,0,369)
-                    aliens(i)\y = QLimit(aliens(i)\y,0,160)
+                        aliens(i)\x = QLimit(aliens(i)\x,0,369)
+                        aliens(i)\y = QLimit(aliens(i)\y,0,160)
+                    EndIf
                 EndIf
                 
                 ; se x=0 allora cambia lo stato dell'alieno in inattivo
@@ -704,7 +755,7 @@ Statement DrawAliens{}
     Use BitMap #BITMAP_FOREGROUND+db
 
     For i=0 To currentWaveNumEnemies-1
-        If aliens(i)\state = #ALIENS_STATE_ACTIVE
+        If aliens(i)\state <> #ALIENS_STATE_INACTIVE 
             QBlit #QUEUE_ID+db,aliens(i)\shapeID+aliens(i)\currFrame,aliens(i)\x,aliens(i)\y
         EndIf
     Next
@@ -798,7 +849,19 @@ Statement CheckCollBulletsAliens{}
                         ; rende inattivo il bullet
                         bullets(i)\state = #BULLET_STATE_INACTIVE
                         ; cambia lo stato dell'alieno in colpito
-                        aliens(j)\state = #ALIENS_STATE_INACTIVE
+                        aliens(j)\state = #ALIENS_STATE_HIT
+                        ; inizializza l'animazione dell'esplosione
+                        ; per il robot arancione usa l'expl02 che è più grande
+                        If aliens(j)\shapeID = #SHAPE_ENEMY08
+                            shapeID = #SHAPE_EXPL02
+                        Else
+                            shapeID = #SHAPE_EXPL01
+                        EndIf
+                        aliens(j)\shapeID   = shapeID
+                        aliens(j)\numFrames = 8
+                        aliens(j)\currFrame = 0
+                        aliens(j)\currDelay = 0
+                        aliens(j)\animDelay = 5
                         ; incrementa il punteggio    
                     EndIf
                 EndIf
@@ -1099,7 +1162,7 @@ Data  8                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,19                 ; width,height
-Data  510                   ; shapeID #SHAPE_ENEMY01
+Data  450                   ; shapeID #SHAPE_ENEMY01
 Data  22                    ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
@@ -1111,7 +1174,7 @@ Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,21                 ; width,height
-Data  520                   ; shapeID #SHAPE_ENEMY02
+Data  460                   ; shapeID #SHAPE_ENEMY02
 Data  40                    ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1123,7 +1186,7 @@ Data  4                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,26                 ; width,height
-Data  530                   ; shapeID #SHAPE_ENEMY04
+Data  480                   ; shapeID #SHAPE_ENEMY04
 Data  57                    ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1135,7 +1198,7 @@ Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,21                 ; width,height
-Data  520                   ; shapeID #SHAPE_ENEMY02
+Data  460                   ; shapeID #SHAPE_ENEMY02
 Data  70                    ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1147,7 +1210,7 @@ Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  2                     ; speed
 Data  32,22                 ; width,height
-Data  529                   ; shapeID #SHAPE_ENEMY03
+Data  470                   ; shapeID #SHAPE_ENEMY03
 Data  87                    ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1159,7 +1222,7 @@ Data  6                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,26                 ; width,height
-Data  550                   ; shapeID #SHAPE_ENEMY06
+Data  500                   ; shapeID #SHAPE_ENEMY06
 Data  96                    ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1171,7 +1234,7 @@ Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,22                 ; width,height
-Data  529                   ; shapeID #SHAPE_ENEMY03
+Data  470                   ; shapeID #SHAPE_ENEMY03
 Data  109                   ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1183,7 +1246,7 @@ Data  3                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,26                 ; width,height
-Data  540                   ; shapeID #SHAPE_ENEMY05
+Data  490                   ; shapeID #SHAPE_ENEMY05
 Data  123                   ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
@@ -1195,7 +1258,7 @@ Data  3                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,26                 ; width,height
-Data  540                   ; shapeID #SHAPE_ENEMY05
+Data  490                   ; shapeID #SHAPE_ENEMY05
 Data  139                   ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
@@ -1207,7 +1270,7 @@ Data  8                     ; numFrames
 Data  5                     ; animDelay
 Data  1                     ; speed
 Data  32,27                 ; width,height
-Data  580                   ; shapeID #SHAPE_ENEMY09 580
+Data  520                   ; shapeID #SHAPE_ENEMY09
 Data  159                   ; mapOffset
 Data  28                    ; pause
 Data  0                     ; yoffset
@@ -1219,7 +1282,7 @@ Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,21                 ; width,height
-Data  520                   ; shapeID #SHAPE_ENEMY02
+Data  460                   ; shapeID #SHAPE_ENEMY02
 Data  192                   ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1231,7 +1294,7 @@ Data  1                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  32,22                 ; width,height
-Data  529                   ; shapeID #SHAPE_ENEMY03
+Data  470                   ; shapeID #SHAPE_ENEMY03
 Data  217                   ; mapOffset
 Data  30                    ; pause
 Data  0                     ; yoffset
@@ -1243,7 +1306,7 @@ Data  5                     ; numFrames
 Data  10                    ; animDelay
 Data  1                     ; speed
 Data  48,43                 ; width,height
-Data  570                   ; shapeID #SHAPE_ENEMY08
+Data  510                   ; shapeID #SHAPE_ENEMY08
 Data  234                   ; mapOffset
 Data  40                    ; pause
 Data  30                    ; yoffset
