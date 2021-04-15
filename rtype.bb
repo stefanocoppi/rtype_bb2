@@ -1,9 +1,9 @@
 ;******************************************************************************
 ; R TYPE
 ; 
-; Shoot'em up a scorrimento orizzontale.
+; Side scrolling shoot'em up.
 ;
-; Scritto in Blitz Basic 2.1 per Amiga 1200 (AGA)
+; Written in Blitz Basic 2.1 for Commodore Amiga 1200/4000 (AGA)
 ;
 ; (c) 2021 Stefano Coppi
 ;******************************************************************************
@@ -17,15 +17,15 @@
 ; Shapes 600
 ;******************************************************************************
 
-; consente l'esecuzione da Workbench
+; allows launch from Workbench
 WBStartup
 
-; usa WORD come tipo di default per i numeri (più veloce rispetto a QUICK)
+; use WORD as default type for numeric variables (faster than QUICK)
 DEFTYPE .w
 
 
 ;******************************************************************************
-; COSTANTI
+; CONSTANTS
 ;******************************************************************************
 #KEY_ESC = $45
 
@@ -49,6 +49,7 @@ DEFTYPE .w
 #BITMAP_FIRE01  = 14
 #BITMAP_EXPL01  = 15
 #BITMAP_EXPL02  = 16
+#BITMAP_ASSET_LD = 17
 
 #PALETTE_MAIN = 0
 
@@ -65,6 +66,7 @@ DEFTYPE .w
 #SHAPE_FIRE01  = 530
 #SHAPE_EXPL01  = 540
 #SHAPE_EXPL02  = 550
+#SHAPE_EXPL03  = 570
 
 #QUEUE_ID = 0
 
@@ -82,6 +84,9 @@ DEFTYPE .w
 #SHIP_ANIM_UP   = 0
 #SHIP_ANIM_DOWN = 2
 #SHIP_SPEED = 2
+#SHIP_STATE_ACTIVE       = 0
+#SHIP_STATE_HIT          = 1
+#SHIP_STATE_INVULNERABLE = 2
 
 #WAVES_NUM = 13
 #WAVE_PATH_LINEAR   = 0
@@ -103,7 +108,7 @@ DEFTYPE .w
 
 
 ;******************************************************************************
-; TIPI DI DATO
+; DATA STRUCTURES
 ;******************************************************************************
 
 NEWTYPE .Vector2
@@ -115,6 +120,11 @@ NEWTYPE .Ship
     x.w
     y.w
     animState.b
+    state.b
+    numFrames.b
+    currFrame.b
+    animDelay.w
+    currDelay.w
 End NEWTYPE
 
 NEWTYPE .Alien
@@ -151,8 +161,9 @@ NEWTYPE .Bullet
     shapeID.w
 End NEWTYPE
 
+
 ;******************************************************************************
-; VARIABILI
+; GLOBAL VARIABLES
 ;******************************************************************************
 Dim map(#MAP_WIDTH,#MAP_HEIGHT)
 scrollX.q = 16.0
@@ -178,8 +189,9 @@ db=0
 Dim bullets.Bullet(#MAX_BULLETS)
 fireDelay = 0
 
+
 ;******************************************************************************
-; Procedure
+; Procedures
 ;******************************************************************************
 
 ; inizializza i tiles usati per la mappa
@@ -199,6 +211,24 @@ Statement InitTiles{}
     Next y
     
     Free BitMap #BITMAP_TILES
+End Statement
+
+
+; carica la grafica per l'expl03 (esplosione del player ship)
+Statement LoadExpl03Gfx{}
+
+    ; bitmap contenente i frames
+    BitMap #BITMAP_ASSET_LD,224,30,4
+    LoadBitMap #BITMAP_ASSET_LD,"expl03.iff"
+
+    ; crea una shape per ogni frame
+    i=#SHAPE_EXPL03
+    For x=0 To 223 Step 32
+        GetaShape i,x,0,32,30
+        i = i+1
+    Next
+
+    Free BitMap #BITMAP_ASSET_LD
 End Statement
 
 
@@ -223,6 +253,13 @@ Statement InitShip{}
     myShip\x = #SHIP_X0
     myShip\y = #SHIP_Y0
     myShip\animState = #SHIP_ANIM_IDLE
+    myShip\state = #SHIP_STATE_ACTIVE
+    myShip\numFrames = 7    ; explosion frames
+    myShip\currFrame = 0
+    myShip\animDelay = 5
+    myShip\currDelay = 0
+
+    LoadExpl03Gfx{}
 End Statement
 
 
@@ -582,24 +619,46 @@ Statement ScrollMap{}
     EndIf
 End Statement
 
+
+; draw the player ship
 Statement DrawShip{}
     Shared myShip,db
 
     Use BitMap #BITMAP_FOREGROUND+db
-    ;UnQueue #QUEUE_ID
-    QBlit #QUEUE_ID+db,#SHAPE_SHIP+myShip\animState,myShip\x,myShip\y
+    
+    If myShip\state = #SHIP_STATE_ACTIVE Then shapeID = #SHAPE_SHIP+myShip\animState
+    If myShip\state = #SHIP_STATE_HIT Then shapeID = #SHAPE_EXPL03+myShip\currFrame
+
+    QBlit #QUEUE_ID+db,shapeID,myShip\x,myShip\y
 End Statement
 
+
+; move and update the player ship
 Statement MoveShip{}
     Shared myShip
 
-    myShip\x = myShip\x + Joyx(1)*#SHIP_SPEED
-    myShip\y = myShip\y + Joyy(1)*#SHIP_SPEED
+    ; if ship is in Hit state, play the explosion animation
+    If myShip\state = #SHIP_STATE_HIT
+        myShip\currDelay = myShip\currDelay+1
+        If myShip\currDelay = myShip\animDelay
+            myShip\currDelay = 0
+            myShip\currFrame = myShip\currFrame+1
+            If myShip\currFrame = myShip\numFrames
+                myShip\state = #SHIP_STATE_ACTIVE
+                myShip\x = #SHIP_X0
+                myShip\y = #SHIP_Y0
+                myShip\animState = #SHIP_ANIM_IDLE
+            EndIf
+        EndIf
+    Else
+        myShip\x = myShip\x + Joyx(1)*#SHIP_SPEED
+        myShip\y = myShip\y + Joyy(1)*#SHIP_SPEED
 
-    myShip\x = QLimit( myShip\x,#FOREGROUND_CLIP_AREA_W,#FOREGROUND_CLIP_AREA_W+320-32)
-    myShip\y = QLimit( myShip\y,0,176)
+        myShip\x = QLimit( myShip\x,#FOREGROUND_CLIP_AREA_W,#FOREGROUND_CLIP_AREA_W+320-32)
+        myShip\y = QLimit( myShip\y,0,176)
 
-    myShip\animState = Joyy(1) + 1
+        myShip\animState = Joyy(1) + 1
+    EndIf
 End Statement
 
 
@@ -871,6 +930,30 @@ Statement CheckCollBulletsAliens{}
 End Statement
 
 
+; Check collisions between player ships and enemies
+Statement CheckCollShipAliens{}
+    Shared aliens(),currentWaveNumEnemies,myShip
+
+    ; loops through all the aliens
+    For i=0 To currentWaveNumEnemies-1
+        ; only active aliens can collide with ship
+        If aliens(i)\state = #ALIENS_STATE_ACTIVE
+            ; if player ship collides with the current alien
+            If ShapesHit(#SHAPE_SHIP,myShip\x,myShip\y,aliens(i)\shapeID,aliens(i)\x,aliens(i)\y) = True
+                ; if ship state is not Hit, change player ship state to "hit"
+                If myShip\state <> #SHIP_STATE_HIT
+                    myShip\state = #SHIP_STATE_HIT
+                    ; reset explosion frame and animation delay
+                    myShip\currFrame = 0
+                    myShip\currDelay = 0
+                    ; decrease lives number
+                EndIf
+            EndIf
+        EndIf
+    Next
+End Statement
+
+
 ;******************************************************************************
 ; MAIN
 ;******************************************************************************
@@ -893,7 +976,7 @@ InitMap{}
 ;******************************************************************************
 ; MAIN LOOP
 ;******************************************************************************
-; ripete main loop finchè non viene premuto il tasto ESC
+; repeats main loop until ESC key is pressed
 Repeat
     VWait
     DisplayBitMap #COPPERLIST_MAIN,#BITMAP_BACKGROUND,scrollX+fineScroll,0,#BITMAP_FOREGROUND+db,#FOREGROUND_CLIP_AREA_W,0
@@ -915,15 +998,16 @@ Repeat
     DrawAliens{}
 
     CheckCollBulletsAliens{}
+    CheckCollShipAliens{}
     
 Until  RawStatus(#KEY_ESC) = True
 
 
 ;******************************************************************************
-; DATI
+; DATA
 ;******************************************************************************
 
-; mappa del livello 1
+; level 1 map
 mapData:
 ; line 0
 Data.w  $0000, $0000, $0000, $0000, $0000, $8000, $8000, $8000, $8000, $E000, $E000, $E000, $E000, $0000, $0000, $0000
